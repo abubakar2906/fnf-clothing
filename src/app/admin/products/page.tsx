@@ -45,7 +45,7 @@ export default async function AdminProductsPage() {
                         <input
                             type="text"
                             placeholder="Search products..."
-                            className="w-full pl-10 pr-4 py-2 border border-light-grey text-sm focus:border-ink-black outline-none placeholder:text-light-grey"
+                            className="w-full pl-10 pr-4 py-2 border border-light-grey text-sm focus:border-ink-black outline-none placeholder:text-light-grey"     
                         />
                     </div>
                 </div>
@@ -76,7 +76,7 @@ export default async function AdminProductsPage() {
                                         <div className="flex items-center gap-4">
                                             <div className="relative w-12 h-16 bg-pale-grey border border-light-grey/50">
                                                 {product.images[0] && (
-                                                    <img src={product.images[0]} alt={product.name} className="absolute inset-0 w-full h-full object-cover" />
+                                                    <img src={product.images[0]} alt={product.name} className="absolute inset-0 w-full h-full object-cover" />      
                                                 )}
                                             </div>
                                             <div>
@@ -113,9 +113,11 @@ export default async function AdminProductsPage() {
                                         <span className="text-xs text-mid-grey uppercase tracking-widest">{product.category}</span>
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        <button className="p-2 text-mid-grey hover:text-ink-black hover:bg-pale-grey transition-colors rounded-sm">
-                                            <Edit2 className="h-4 w-4" />
-                                        </button>
+                                        <Link href={`/admin/products/${product.id}`}>
+                                            <button className="p-2 text-mid-grey hover:text-ink-black hover:bg-pale-grey transition-colors rounded-sm">
+                                                <Edit2 className="h-4 w-4" />
+                                            </button>
+                                        </Link>
                                     </td>
                                 </tr>
                             ))}
