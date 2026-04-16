@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { UploadCloud, X, ArrowLeft, Loader2 } from 'lucide-react';
+import { UploadCloud, X, ArrowLeft, Loader2, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 
@@ -22,9 +22,8 @@ export default function AddProductPage() {
     const [inStock, setInStock] = useState(true);
     const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
     
-    // Image Upload State
-    const [imageFile, setImageFile] = useState<File | null>(null);
-    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    // Image Upload State - NOW SUPPORTS MULTIPLE IMAGES
+    const [images, setImages] = useState<{ file: File; preview: string }[]>([]);
 
     // Size arrays from PRD
     const kidsSizes = ["0-3M", "3-6M", "6-9M", "9-12M", "12-18M", "18-24M", "2-3Y", "3-4Y", "4-5Y", "5-6Y", "6-7Y", "7-8Y", "8-9Y", "9-10Y", "10-11Y", "11-12Y", "13Y", "14Y", "15Y", "16Y", "17Y", "18Y"];
@@ -37,38 +36,30 @@ export default function AddProductPage() {
         );
     };
 
+    // FIXED: Allow multiple images
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            setImageFile(file);
-            setImagePreview(URL.createObjectURL(file));
+        if (e.target.files) {
+            Array.from(e.target.files).forEach(file => {
+                const preview = URL.createObjectURL(file);
+                setImages(prev => [...prev, { file, preview }]);
+            });
         }
     };
 
+    // FIXED: Add ability to remove images
+    const removeImage = (index: number) => {
+        setImages(prev => prev.filter((_, i) => i !== index));
+    };
+
     const handlePublish = async () => {
-        if (!name || !price || !imageFile || selectedSizes.length === 0) {
-            alert('Please fill out all required fields: Name, Price, Image, and at least one Size.');
+        if (!name || !price || images.length === 0 || selectedSizes.length === 0) {
+            alert('Please fill out all required fields: Name, Price, Images, and at least one Size.');
             return;
         }
 
         setIsLoading(true);
         try {
-            // 1. Upload Image to Supabase Storage
-            const fileExt = imageFile.name.split('.').pop();
-            const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
-            const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('product-images')
-                .upload(fileName, imageFile);
-
-            if (uploadError) throw new Error('Image upload failed: ' + uploadError.message);
-
-            const { data: publicUrlData } = supabase.storage
-                .from('product-images')
-                .getPublicUrl(fileName);
-
-            const imageUrl = publicUrlData.publicUrl;
-
-            // 2. Insert Product
+            // 2. Insert Product FIRST (before images)
             const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') + '-' + Date.now().toString().slice(-4);
             const { data: productData, error: productError } = await supabase
                 .from('products')
@@ -88,15 +79,34 @@ export default function AddProductPage() {
             if (productError) throw new Error('Failed to create product: ' + productError.message);
             const productId = productData.id;
 
-            // 3. Insert Image Record
-            const { error: imageRecordError } = await supabase
-                .from('product_images')
-                .insert({
-                    product_id: productId,
-                    image_url: imageUrl,
-                    display_order: 0
-                });
-            if (imageRecordError) console.error("Image record insert error:", imageRecordError);
+            // 1. Upload ALL Images to Supabase Storage (with proper display order)
+            for (let i = 0; i < images.length; i++) {
+                const { file } = images[i];
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+                
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('product-images')
+                    .upload(fileName, file);
+
+                if (uploadError) throw new Error('Image upload failed: ' + uploadError.message);
+
+                const { data: publicUrlData } = supabase.storage
+                    .from('product-images')
+                    .getPublicUrl(fileName);
+
+                const imageUrl = publicUrlData.publicUrl;
+
+                // 3. Insert Image Record with correct display order
+                const { error: imageRecordError } = await supabase
+                    .from('product_images')
+                    .insert({
+                        product_id: productId,
+                        image_url: imageUrl,
+                        display_order: i
+                    });
+                if (imageRecordError) console.error("Image record insert error:", imageRecordError);
+            }
 
             // 4. Insert Sizes
             const sizeInserts = selectedSizes.map(size => ({
@@ -147,7 +157,7 @@ export default function AddProductPage() {
                             <div className="grid grid-cols-2 gap-6">
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-sans uppercase tracking-widest text-mid-grey">Category *</label>
-                                    <select 
+                                    <select
                                         className="w-full border-b border-light-grey focus:border-ink-black py-2 outline-none font-sans text-sm transition-colors bg-white"
                                         value={category}
                                         onChange={(e) => {
@@ -177,27 +187,38 @@ export default function AddProductPage() {
                         </div>
                     </div>
 
-                    {/* Image Upload */}
+                    {/* Image Upload - NOW WITH MULTIPLE SUPPORT */}
                     <div className="bg-white p-6 border border-light-grey shadow-sm">
                         <h2 className="text-xs font-sans uppercase tracking-widest text-ink-black font-semibold mb-6">Media *</h2>
                         
-                        <label className="border-2 border-dashed border-light-grey bg-off-white hover:border-brand-gold transition-colors p-10 flex flex-col items-center justify-center text-center cursor-pointer relative overflow-hidden">
-                            <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
-                            {imagePreview ? (
-                                <div className="absolute inset-0">
-                                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
-                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                                        <span className="text-white font-sans text-sm font-semibold uppercase tracking-widest">Change Image</span>
-                                    </div>
-                                </div>
-                            ) : (
-                                <>
-                                    <UploadCloud className="h-8 w-8 text-mid-grey mb-3" />
-                                    <p className="text-sm font-sans text-ink-black font-medium mb-1">Click to upload image</p>
-                                    <p className="text-[10px] font-sans uppercase tracking-widest text-mid-grey">JPG, PNG, WEBP up to 5MB</p>
-                                </>
-                            )}
+                        {/* Upload Area */}
+                        <label className="border-2 border-dashed border-light-grey bg-off-white hover:border-brand-gold transition-colors p-10 flex flex-col items-center justify-center text-center cursor-pointer mb-6">
+                            <input type="file" accept="image/*" multiple onChange={handleImageChange} className="hidden" />
+                            <UploadCloud className="h-8 w-8 text-mid-grey mb-3" />
+                            <p className="text-sm font-sans text-ink-black font-medium mb-1">Click to upload images</p>
+                            <p className="text-[10px] font-sans uppercase tracking-widest text-mid-grey">JPG, PNG, WEBP up to 5MB each (upload multiple at once)</p>
                         </label>
+
+                        {/* Image Previews with Remove Buttons */}
+                        {images.length > 0 && (
+                            <div>
+                                <p className="text-[10px] font-sans uppercase tracking-widest text-mid-grey mb-4">Uploaded Images ({images.length})</p>
+                                <div className="grid grid-cols-3 gap-4">
+                                    {images.map((image, index) => (
+                                        <div key={index} className="relative group border border-light-grey bg-pale-grey aspect-square overflow-hidden">
+                                            <img src={image.preview} alt="Preview" className="w-full h-full object-cover" />
+                                            <button
+                                                onClick={() => removeImage(index)}
+                                                type="button"
+                                                className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                                            >
+                                                <Trash2 className="h-6 w-6 text-white" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -249,6 +270,7 @@ export default function AddProductPage() {
                                         <button 
                                             key={size}
                                             onClick={() => toggleSize(size)}
+                                            type="button"
                                             className={`border py-2 text-[10px] font-sans transition-colors ${
                                                 isSelected 
                                                 ? 'border-ink-black bg-ink-black text-white' 
@@ -275,6 +297,7 @@ export default function AddProductPage() {
                     onClick={() => router.push('/admin/products')}
                     className="border border-ink-black text-ink-black px-8 py-3 text-xs font-sans font-semibold uppercase tracking-widest hover:bg-off-white transition-colors disabled:opacity-50"
                     disabled={isLoading}
+                    type="button"
                 >
                     Cancel
                 </button>
@@ -282,6 +305,7 @@ export default function AddProductPage() {
                     onClick={handlePublish}
                     disabled={isLoading}
                     className="bg-ink-black text-white px-8 py-3 text-xs font-sans font-semibold uppercase tracking-widest hover:bg-charcoal transition-colors flex items-center justify-center min-w-[180px] disabled:opacity-50"
+                    type="button"
                 >
                     {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Publish Product'}
                 </button>

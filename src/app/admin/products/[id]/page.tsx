@@ -175,7 +175,7 @@ export default function EditProductPage() {
                 if (imageRecordError) console.error('Error saving image record:', imageRecordError);
             }
 
-            // 4. Update sizes
+            // 4. Update sizes - DELETE old, then INSERT new
             const { error: deleteSizesError } = await supabase
                 .from('product_sizes')
                 .delete()
@@ -283,6 +283,7 @@ export default function EditProductPage() {
                                         <div key={image.id} className="relative group border border-light-grey bg-pale-grey aspect-square overflow-hidden">
                                             <img src={image.image_url} alt="Product" className="w-full h-full object-cover" />
                                             <button
+                                                type="button"
                                                 onClick={() => removeExistingImage(image.id)}
                                                 className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                                             >
@@ -311,6 +312,7 @@ export default function EditProductPage() {
                                         <div key={index} className="relative group border border-light-grey bg-pale-grey aspect-square overflow-hidden">
                                             <img src={image.preview} alt="Preview" className="w-full h-full object-cover" />
                                             <button
+                                                type="button"
                                                 onClick={() => removeNewImage(index)}
                                                 className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                                             >
@@ -371,6 +373,7 @@ export default function EditProductPage() {
                                     return (
                                         <button
                                             key={size}
+                                            type="button"
                                             onClick={() => toggleSize(size)}
                                             className={`border py-2 text-[10px] font-sans transition-colors ${
                                                 isSelected
@@ -394,6 +397,7 @@ export default function EditProductPage() {
             {/* Bottom Actions Bar */}
             <div className="fixed bottom-0 left-0 md:left-64 right-0 bg-white border-t border-light-grey p-4 px-8 flex justify-end gap-4 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-10">
                 <button 
+                    type="button"
                     onClick={() => router.push('/admin/products')}
                     className="border border-ink-black text-ink-black px-8 py-3 text-xs font-sans font-semibold uppercase tracking-widest hover:bg-off-white transition-colors disabled:opacity-50"
                     disabled={isSaving}
@@ -401,6 +405,7 @@ export default function EditProductPage() {
                     Cancel
                 </button>
                 <button
+                    type="button"
                     onClick={handleSave}
                     disabled={isSaving}
                     className="bg-ink-black text-white px-8 py-3 text-xs font-sans font-semibold uppercase tracking-widest hover:bg-charcoal transition-colors flex items-center justify-center min-w-[180px] disabled:opacity-50"
